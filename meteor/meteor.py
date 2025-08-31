@@ -5,7 +5,31 @@ import os
 import subprocess
 import threading
 import tarfile
-from evaluation.utils import download_from_url
+
+
+def download_from_url(url, save_path):
+    """
+    Download a file from a URL and save it to a local path with progress display.
+
+    Args:
+        url (str): The URL of the file to download.
+        save_path (str): The local path where the file will be saved.
+    """
+    # Create folder if it doesn't exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    
+    def _progress(block_num, block_size, total_size):
+        downloaded = block_num * block_size
+        percent = downloaded / total_size * 100 if total_size > 0 else 0
+        sys.stdout.write('\rDownloading: {:.2f}%'.format(min(percent, 100)))
+        sys.stdout.flush()
+    
+    print(f"Downloading from {url} to {save_path} ...")
+    try:
+        urllib.request.urlretrieve(url, save_path, reporthook=_progress)
+        print("\nDownload completed!")
+    except Exception as e:
+        print(f"\nError downloading file: {e}")
 
 METEOR_GZ_URL = 'http://aimagelab.ing.unimore.it/speaksee/data/meteor.tgz'
 METEOR_JAR = 'meteor-1.5.jar'
