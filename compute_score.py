@@ -19,14 +19,14 @@ def compute_score(ground_truth, generation):
     rouge = Rouge()
 
     scores = {
-        "accuracy": accuracy.score(ground_truth, generation),
-        "bleu": bleu.score(ground_truth, generation),
-        "cider": cider.score(ground_truth, generation),
-        "f1": f1.score(ground_truth, generation),
-        "meteor": meteor.score(ground_truth, generation),
-        "precision": precision.score(ground_truth, generation),
-        "recall": recall.score(ground_truth, generation),
-        "rouge": rouge.score(ground_truth, generation),
+        "accuracy": accuracy.compute_score(ground_truth, generation),
+        "bleu": bleu.compute_score(ground_truth, generation),
+        "cider": cider.compute_score(ground_truth, generation),
+        "f1": f1.compute_score(ground_truth, generation),
+        "meteor": meteor.compute_score(ground_truth, generation),
+        "precision": precision.compute_score(ground_truth, generation),
+        "recall": recall.compute_score(ground_truth, generation),
+        "rouge": rouge.compute_score(ground_truth, generation),
     }
 
     return scores
