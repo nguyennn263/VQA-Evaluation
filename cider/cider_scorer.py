@@ -145,18 +145,29 @@ class CiderScorer(object):
             # compute vector for test captions
             vec, norm, length = counts2vec(test)
             # compute vector for ref captions
-            score = np.array([0.0 for _ in range(self.n)])
+            ref_scores = []
             for ref in refs:
                 vec_ref, norm_ref, length_ref = counts2vec(ref)
-                score += sim(vec, vec_ref, norm, norm_ref, length, length_ref)
-            # change by vrama91 - mean of ngram scores, instead of sum
-            score_avg = np.mean(score)
-            # divide by number of references
-            score_avg /= len(refs)
-            # multiply score by 10
-            score_avg *= 10.0
-            # append score of an image to the score list
-            scores.append(score_avg)
+                score = sim(vec, vec_ref, norm, norm_ref, length, length_ref)
+                score_avg = np.mean(score) * 10.0  # multiply inside loop
+                ref_scores.append(score_avg)
+
+            # Take the maximum score among all references for this test sample
+            scores.append(max(ref_scores))
+            
+            
+            # score = np.array([0.0 for _ in range(self.n)])
+            # for ref in refs:
+            #     vec_ref, norm_ref, length_ref = counts2vec(ref)
+            #     score += sim(vec, vec_ref, norm, norm_ref, length, length_ref)
+            # # change by vrama91 - mean of ngram scores, instead of sum
+            # score_avg = np.mean(score)
+            # # divide by number of references
+            # score_avg /= len(refs)
+            # # multiply score by 10
+            # score_avg *= 10.0
+            # # append score of an image to the score list
+            # scores.append(score_avg)
         return scores
 
     def compute_score(self):

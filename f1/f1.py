@@ -29,7 +29,7 @@ class F1:
 
                         scores_per_res.append(2*(prec*rec)/(prec+rec))
 
-            scores_per_res = np.array(scores_per_res).mean()
+            scores_per_res = np.array(scores_per_res).max()
             scores.append(scores_per_res)
 
         scores = np.array(scores)
