@@ -1,4 +1,5 @@
 import re
+import traceback
 import unicodedata
 import string
 import numpy as np
@@ -109,12 +110,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính CIDEr
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà cider module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.cider_caculate.compute_score(gts, res)
             scores.append(score)
         
@@ -132,12 +135,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính Accuracy
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà accuracy module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.acc_caculate.compute_score(gts, res)
             scores.append(score)
         
@@ -155,12 +160,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính BLEU
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà bleu module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.bleu_caculate.compute_score(gts, res)
             # BLEU có thể trả về tuple, lấy phần tử cuối
             if isinstance(score, (list, tuple)):
@@ -181,12 +188,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính METEOR
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà meteor module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             try:
                 score, _ = self.meteor_caculate.compute_score(gts, res)
                 scores.append(score)
@@ -209,12 +218,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính Precision
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà precision module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.precision_caculate.compute_score(gts, res)
             scores.append(score)
         
@@ -232,12 +243,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính Recall
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà recall module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.recall_caculate.compute_score(gts, res)
             scores.append(score)
         
@@ -255,12 +268,14 @@ class ScoreCalculator:
         
         # Preprocessing trước khi tính ROUGE
         pred_processed = preprocess_sentence(normalize_text(pred))
+        joined_pred_processed = " ".join(pred_processed)
         
         for i, label in enumerate(labels):
             label_processed = preprocess_sentence(normalize_text(label))
+            joined_label_processed = " ".join(label_processed)
             # Chuẩn bị dữ liệu theo format mà rouge module yêu cầu
-            gts = {str(i): [label_processed]}
-            res = {str(i): [pred_processed]}
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
             score, _ = self.rouge_caculate.compute_score(gts, res)
             scores.append(score)
         
@@ -341,55 +356,55 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
         try:
             all_scores["accuracy"].append(calculator.accuracy_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"Accuracy error at sample {i}: {e}")
+            print(f"Accuracy error at sample {i}: {traceback.format_exc()}")
             all_scores["accuracy"].append(0.0)
             
         try:
             all_scores["bleu"].append(calculator.bleu_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"BLEU error at sample {i}: {e}")
+            print(f"BLEU error at sample {i}: {traceback.format_exc()}")
             all_scores["bleu"].append(0.0)
             
         try:
             all_scores["cider"].append(calculator.cider_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"CIDEr error at sample {i}: {e}")
+            print(f"CIDEr error at sample {i}: {traceback.format_exc()}")
             all_scores["cider"].append(0.0)
 
         try:
             all_scores["f1_token"].append(calculator.f1_token(clean_gts, clean_gen))
         except Exception as e:
-            print(f"F1 token error at sample {i}: {e}")
+            print(f"F1 token error at sample {i}: {traceback.format_exc()}")
             all_scores["f1_token"].append(0.0)
             
         try:
             all_scores["meteor"].append(calculator.meteor_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"METEOR error at sample {i}: {e}")
+            print(f"METEOR error at sample {i}: {traceback.format_exc()}")
             all_scores["meteor"].append(0.0)
             
         try:
             all_scores["precision"].append(calculator.precision_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"Precision error at sample {i}: {e}")
+            print(f"Precision error at sample {i}: {traceback.format_exc()}")
             all_scores["precision"].append(0.0)
             
         try:
             all_scores["recall"].append(calculator.recall_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"Recall error at sample {i}: {e}")
+            print(f"Recall error at sample {i}: {traceback.format_exc()}")
             all_scores["recall"].append(0.0)
             
         try:
             all_scores["rouge"].append(calculator.rouge_score(clean_gts, clean_gen))
         except Exception as e:
-            print(f"ROUGE error at sample {i}: {e}")
+            print(f"ROUGE error at sample {i}: {traceback.format_exc()}")
             all_scores["rouge"].append(0.0)
             
         try:
             all_scores["wup"].append(calculator.wup(clean_gts, clean_gen))
         except Exception as e:
-            print(f"WUP error at sample {i}: {e}")
+            print(f"WUP error at sample {i}: {traceback.format_exc()}")
             all_scores["wup"].append(0.0)
     
     # Tính điểm trung bình
