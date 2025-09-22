@@ -15,7 +15,7 @@ class Accuracy:
             scores_per_res = []
             for gt in gts[key]:
                 scores_per_res.append(int(r == gt))
-            score = np.array(scores_per_res).max()
+            score = np.array(scores_per_res).mean()
             scores.append(score)
 
         scores = np.array(scores)

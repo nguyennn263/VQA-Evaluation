@@ -26,7 +26,7 @@ class Precision:
                     else:
                         scores_per_res.append(len(common_tokens)/len(r))
 
-            scores_per_res = np.array(scores_per_res).max()
+            scores_per_res = np.array(scores_per_res).mean()
             scores.append(scores_per_res)
 
         scores = np.array(scores)

@@ -6,9 +6,10 @@ from .accuracy import Accuracy
 from .f1 import F1
 from .precision import Precision
 from .recall import Recall
+from .wup import Wup
 
 def compute_scores(gts, gen):
-    metrics = (Bleu(), Meteor(), Rouge(), Cider(), Accuracy(), Precision(), Recall(), F1())
+    metrics = (Bleu(), Meteor(), Rouge(), Cider(), Wup(), Accuracy(), Precision(), Recall(), F1())
     all_score = {}
     all_scores = {}
     for metric in metrics:

@@ -1,80 +1,299 @@
+import re
+import unicodedata
+import string
+import numpy as np
+from typing import List
 from accuracy import Accuracy
 from bleu import Bleu
 from cider import Cider
 from f1 import F1
 from meteor import Meteor
 from precision import Precision
-from recall import Recall 
-from rouge import Rouge
-from tqdm import tqdm
+from recall import Recall
+from rouge import Rouge 
+from wup import Wup
+
+def normalize_text(text):
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    text = text.lower().strip()
+    return text
+
+def preprocess_sentence(sentence: str, tokenizer=None):
+    sentence = sentence.lower()
+    sentence = unicodedata.normalize('NFC', sentence)
+    sentence = re.sub(r"[“”]", "\"", sentence)
+    sentence = re.sub(r"!", " ! ", sentence)
+    sentence = re.sub(r"\?", " ? ", sentence)
+    sentence = re.sub(r":", " : ", sentence)
+    sentence = re.sub(r";", " ; ", sentence)
+    sentence = re.sub(r",", " , ", sentence)
+    sentence = re.sub(r"\"", " \" ", sentence)
+    sentence = re.sub(r"'", " ' ", sentence)
+    sentence = re.sub(r"\(", " ( ", sentence)
+    sentence = re.sub(r"\[", " [ ", sentence)
+    sentence = re.sub(r"\)", " ) ", sentence)
+    sentence = re.sub(r"\]", " ] ", sentence)
+    sentence = re.sub(r"/", " / ", sentence)
+    sentence = re.sub(r"\.", " . ", sentence)
+    sentence = re.sub(r"-", " - ", sentence)
+    sentence = re.sub(r"\$", " $ ", sentence)
+    sentence = re.sub(r"\&", " & ", sentence)
+    sentence = re.sub(r"\*", " * ", sentence)
+    # tokenize the sentence
+    if tokenizer is None:
+        tokenizer = lambda s: s
+    sentence = tokenizer(sentence)
+    sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
+    tokens = sentence.strip().split()
+
+    return tokens
+
+class ScoreCalculator:
+    def __init__(self):
+        self.acc_caculate=Accuracy()
+        self.bleu_caculate=Bleu()
+        self.cider_caculate=Cider()
+        self.f1_caculate=F1()
+        self.meteor_caculate=Meteor()
+        self.precision_caculate=Precision()
+        self.recall_caculate=Recall()
+        self.rouge_caculate=Rouge()
+        self.wup_caculate=Wup()
+     
+
+    #F1 score token level - lấy max score với nhiều ground truths  
+    def f1_token(self, labels: List[str], pred: str) -> float:
+        """
+        Tính F1 score token level, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max F1 score
+        """
+        scores = []
+        pred_processed = str(preprocess_sentence(normalize_text(pred))).split()
+        
+        for label in labels:
+            label_processed = str(preprocess_sentence(normalize_text(label))).split()
+            score = self.f1_caculate.compute_score(label_processed, pred_processed)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
 
 
-def compute_score(ground_truths, generation):
+    #Wup score - lấy max score với nhiều ground truths
+    def wup(self, labels: List[str], pred: str) -> float:
+        """
+        Tính WUP score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max WUP score
+        """
+        scores = []
+        pred_processed = str(preprocess_sentence(normalize_text(pred))).split()
+        
+        for label in labels:
+            label_processed = str(preprocess_sentence(normalize_text(label))).split()
+            score = self.wup_caculate.compute_score(label_processed, pred_processed)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    #Cider score - lấy max score với nhiều ground truths
+    def cider_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính CIDEr score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max CIDEr score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính CIDEr
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà cider module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.cider_caculate.compute_score(gts, res)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+    #Accuracy score - lấy max score với nhiều ground truths
+    def accuracy_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính Accuracy score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max Accuracy score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính Accuracy
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà accuracy module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.acc_caculate.compute_score(gts, res)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+    #BLEU score - lấy max score với nhiều ground truths
+    def bleu_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính BLEU score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max BLEU score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính BLEU
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà bleu module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.bleu_caculate.compute_score(gts, res)
+            # BLEU có thể trả về tuple, lấy phần tử cuối
+            if isinstance(score, (list, tuple)):
+                score = score[-1] if len(score) > 0 else 0.0
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+    #METEOR score - lấy max score với nhiều ground truths
+    def meteor_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính METEOR score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max METEOR score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính METEOR
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà meteor module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            try:
+                score, _ = self.meteor_caculate.compute_score(gts, res)
+                scores.append(score)
+            except Exception as e:
+                # METEOR có thể có vấn đề với Java subprocess
+                print(f"METEOR error for label {i}: {e}")
+                scores.append(0.0)
+        
+        return max(scores) if scores else 0.0
+    
+    #Precision score - lấy max score với nhiều ground truths
+    def precision_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính Precision score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max Precision score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính Precision
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà precision module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.precision_caculate.compute_score(gts, res)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+    #Recall score - lấy max score với nhiều ground truths
+    def recall_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính Recall score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max Recall score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính Recall
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà recall module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.recall_caculate.compute_score(gts, res)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+    #ROUGE score - lấy max score với nhiều ground truths
+    def rouge_score(self, labels: List[str], pred: str) -> float:
+        """
+        Tính ROUGE score, lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Max ROUGE score
+        """
+        scores = []
+        
+        # Preprocessing trước khi tính ROUGE
+        pred_processed = preprocess_sentence(normalize_text(pred))
+        
+        for i, label in enumerate(labels):
+            label_processed = preprocess_sentence(normalize_text(label))
+            # Chuẩn bị dữ liệu theo format mà rouge module yêu cầu
+            gts = {str(i): [label_processed]}
+            res = {str(i): [pred_processed]}
+            score, _ = self.rouge_caculate.compute_score(gts, res)
+            scores.append(score)
+        
+        return max(scores) if scores else 0.0
+    
+
+def compute_score(ground_truths: List[str], generation: str):
     """
-    Tính toán các metric đánh giá cho VQA
+    Tính toán các metric đánh giá cho VQA với max score
     :param ground_truths: list các câu trả lời đúng (list of strings)
     :param generation: câu trả lời được sinh ra (string)
     :return: dictionary chứa các điểm số
     """
+    calculator = ScoreCalculator()
     
-    # Chuyển đổi dữ liệu thành format mà các metric module yêu cầu
-    # Sử dụng key duy nhất '0' cho single sample
-    gts = {'0': ground_truths}  # ground truths là list
-    res = {'0': [generation]}   # generation được wrap trong list
-    
-    accuracy = Accuracy()
-    bleu = Bleu()
-    cider = Cider()
-    f1 = F1()
-    meteor = Meteor()
-    precision = Precision()
-    recall = Recall()
-    rouge = Rouge()
-
-    scores = {}
-    
-
-    # Đối với từng metric, lấy max score giữa các ground truths và generation
-    metric_objs = {
-        "accuracy": accuracy,
-        "bleu": bleu,
-        "cider": cider,
-        "f1": f1,
-        "meteor": meteor,
-        "precision": precision,
-        "recall": recall,
-        "rouge": rouge
+    scores = {
+        "accuracy": calculator.accuracy_score(ground_truths, generation),
+        "bleu": calculator.bleu_score(ground_truths, generation),
+        "cider": calculator.cider_score(ground_truths, generation),
+        "f1_token": calculator.f1_token(ground_truths, generation),
+        "meteor": calculator.meteor_score(ground_truths, generation),
+        "precision": calculator.precision_score(ground_truths, generation),
+        "recall": calculator.recall_score(ground_truths, generation),
+        "rouge": calculator.rouge_score(ground_truths, generation),
+        "wup": calculator.wup(ground_truths, generation)
     }
-
-    for metric_name, metric_obj in metric_objs.items():
-        try:
-            # Tính score cho từng ground truth
-            individual_scores = []
-            for gt in ground_truths:
-                single_gts = {'0': [gt]}
-                score, _ = metric_obj.compute_score(single_gts, res)
-                # BLEU có thể trả về tuple
-                if metric_name == "bleu" and isinstance(score, (list, tuple)):
-                    score = score[-1] if len(score) > 0 else 0.0
-                if isinstance(score, str):
-                    try:
-                        import re
-                        numbers = re.findall(r'-?\d+\.?\d*', score)
-                        score = float(numbers[-1]) if numbers else 0.0
-                    except:
-                        pass
-                individual_scores.append(float(score))
-            max_score = max(individual_scores)
-            scores[metric_name] = max_score
-        except Exception as e:
-            scores[metric_name] = f"Error: {str(e)}"
-
+    
     return scores
 
 
-def compute_all_data(all_ground_truths, all_generations):
+def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[str]):
     """
-    Tính toán các metric đánh giá cho toàn bộ dataset
+    Tính toán các metric đánh giá cho toàn bộ dataset với max score
     :param all_ground_truths: list of lists - mỗi phần tử là list các câu trả lời đúng cho 1 sample
     :param all_generations: list of strings - mỗi phần tử là câu trả lời được sinh ra cho 1 sample
     :return: dictionary chứa các điểm số trung bình
@@ -83,14 +302,27 @@ def compute_all_data(all_ground_truths, all_generations):
     if len(all_ground_truths) != len(all_generations):
         raise ValueError("Số lượng ground_truths và generations phải bằng nhau")
     
-    print("Preparing data for evaluation...")
-    # Chuyển đổi dữ liệu thành format mà các metric module yêu cầu
-    gts = {}
-    res = {}
+    print("Computing evaluation metrics with max scoring...")
     
-    for i, (ground_truths, generation) in tqdm(enumerate(zip(all_ground_truths, all_generations)), 
-                                               total=len(all_ground_truths),
-                                               desc="Processing samples"):
+    all_scores = {
+        "accuracy": [],
+        "bleu": [],
+        "cider": [],
+        "f1_token": [],
+        "meteor": [],
+        "precision": [],
+        "recall": [],
+        "rouge": [],
+        "wup": []
+    }
+    
+    calculator = ScoreCalculator()
+    
+    # Tính toán score cho từng sample
+    for i, (ground_truths, generation) in enumerate(zip(all_ground_truths, all_generations)):
+        if i % 100 == 0:
+            print(f"Processing sample {i}/{len(all_ground_truths)}")
+        
         # Đảm bảo ground_truths là list of strings
         clean_gts = []
         for gt in ground_truths:
@@ -105,81 +337,76 @@ def compute_all_data(all_ground_truths, all_generations):
         else:
             clean_gen = str(generation).strip()
         
-        gts[str(i)] = clean_gts  # ground truths là list of strings
-        res[str(i)] = [clean_gen]   # generation được wrap trong list
-    
-    accuracy = Accuracy()
-    bleu = Bleu()
-    cider = Cider()
-    f1 = F1()
-    meteor = Meteor()
-    precision = Precision()
-    recall = Recall()
-    rouge = Rouge()
-
-    scores = {}
-    
-    # Tạo list các metrics để tính toán với progress bar
-    metrics = [
-        ("accuracy", accuracy),
-        ("bleu", bleu),
-        ("cider", cider),
-        ("f1", f1),
-        ("meteor", meteor),
-        ("precision", precision),
-        ("recall", recall),
-        ("rouge", rouge)
-    ]
-    
-    print("Computing evaluation metrics...")
-    for metric_name, metric_obj in metrics:
+        # Tính score cho tất cả metrics
         try:
-            # Special handling for specific metrics
-            if metric_name == "bleu":
-                # BLEU có thể cần format đặc biệt
-                score, individual_scores = metric_obj.compute_score(gts, res)
-                # Xử lý case BLEU trả về tuple hoặc list
-                if isinstance(score, (list, tuple)):
-                    score = score[-1] if len(score) > 0 else 0.0
-            elif metric_name == "meteor":
-                # METEOR có thể có vấn đề với Java subprocess
-                try:
-                    score, individual_scores = metric_obj.compute_score(gts, res)
-                except Exception as meteor_error:
-                    print(f"METEOR specific error: {meteor_error}")
-                    scores[metric_name] = f"Error: METEOR Java subprocess failed - {str(meteor_error)}"
-                    continue
-            else:
-                score, individual_scores = metric_obj.compute_score(gts, res)
-            
-            # Ensure score is a number
-            if isinstance(score, str):
-                # Try to extract number from string
-                import re
-                numbers = re.findall(r'-?\d+\.?\d*', score)
-                if numbers:
-                    score = float(numbers[-1])
-                else:
-                    raise ValueError(f"Cannot extract numeric score from: {score}")
-            
-            scores[metric_name] = {
-                "average": float(score),
-                "individual": individual_scores.tolist() if hasattr(individual_scores, 'tolist') else individual_scores
-            }
-            print(f"✓ {metric_name.upper()}: {score:.4f}")
-            
+            all_scores["accuracy"].append(calculator.accuracy_score(clean_gts, clean_gen))
         except Exception as e:
-            error_msg = str(e)
-            scores[metric_name] = f"Error: {error_msg}"
-            print(f"✗ {metric_name.upper()}: Error - {error_msg}")
+            print(f"Accuracy error at sample {i}: {e}")
+            all_scores["accuracy"].append(0.0)
             
-            # For debugging: print more specific error info
-            if metric_name in ["bleu", "meteor"]:
-                print(f"  Debug info for {metric_name}: {type(e).__name__}")
-                print(f"  Data sample - GT: {list(gts.keys())[:2]}, RES: {list(res.keys())[:2]}")
-                if list(gts.keys()):
-                    first_key = list(gts.keys())[0]
-                    print(f"  Sample data - GT[{first_key}]: {gts[first_key][:2]}")
-                    print(f"  Sample data - RES[{first_key}]: {res[first_key]}")
+        try:
+            all_scores["bleu"].append(calculator.bleu_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"BLEU error at sample {i}: {e}")
+            all_scores["bleu"].append(0.0)
+            
+        try:
+            all_scores["cider"].append(calculator.cider_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"CIDEr error at sample {i}: {e}")
+            all_scores["cider"].append(0.0)
 
-    return scores
+        try:
+            all_scores["f1_token"].append(calculator.f1_token(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"F1 token error at sample {i}: {e}")
+            all_scores["f1_token"].append(0.0)
+            
+        try:
+            all_scores["meteor"].append(calculator.meteor_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"METEOR error at sample {i}: {e}")
+            all_scores["meteor"].append(0.0)
+            
+        try:
+            all_scores["precision"].append(calculator.precision_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"Precision error at sample {i}: {e}")
+            all_scores["precision"].append(0.0)
+            
+        try:
+            all_scores["recall"].append(calculator.recall_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"Recall error at sample {i}: {e}")
+            all_scores["recall"].append(0.0)
+            
+        try:
+            all_scores["rouge"].append(calculator.rouge_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"ROUGE error at sample {i}: {e}")
+            all_scores["rouge"].append(0.0)
+            
+        try:
+            all_scores["wup"].append(calculator.wup(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"WUP error at sample {i}: {e}")
+            all_scores["wup"].append(0.0)
+    
+    # Tính điểm trung bình
+    final_scores = {}
+    for metric_name, scores_list in all_scores.items():
+        if scores_list:
+            avg_score = np.mean(scores_list)
+            final_scores[metric_name] = {
+                "average": float(avg_score),
+                "individual": scores_list
+            }
+            print(f"✓ {metric_name.upper()}: {avg_score:.4f}")
+        else:
+            final_scores[metric_name] = {
+                "average": 0.0,
+                "individual": []
+            }
+            print(f"✗ {metric_name.upper()}: No valid scores")
+    
+    return final_scores
