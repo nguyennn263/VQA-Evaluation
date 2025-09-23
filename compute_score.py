@@ -13,6 +13,7 @@ from precision import Precision
 from recall import Recall
 from rouge import Rouge 
 from wup import Wup
+from tqdm import tqdm 
 
 def normalize_text(text):
     text = text.translate(str.maketrans("", "", string.punctuation))
@@ -71,12 +72,19 @@ class ScoreCalculator:
         :return: Max F1 score
         """
         scores = []
-        pred_processed = str(preprocess_sentence(normalize_text(pred))).split()
-        
-        for label in labels:
-            label_processed = str(preprocess_sentence(normalize_text(label))).split()
-            score = self.f1_caculate.compute_score(label_processed, pred_processed)
-            scores.append(score)
+        pred_processed = str(preprocess_sentence(normalize_text(pred)))
+        joined_pred_processed = " ".join(pred_processed)
+
+        for i, label in enumerate(labels):
+            label_processed = str(preprocess_sentence(normalize_text(label)))
+            joined_label_processed = " ".join(label_processed)
+            gts = {str(i): [joined_label_processed]}
+            res = {str(i): [joined_pred_processed]}
+            score, _ = self.f1_caculate.compute_score(gts, res)
+            # Đảm bảo score là scalar
+            if isinstance(score, (list, tuple, np.ndarray)):
+                score = float(score[0]) if len(score) > 0 else 0.0
+            scores.append(float(score))
         
         return max(scores) if scores else 0.0
 
@@ -95,7 +103,9 @@ class ScoreCalculator:
         for label in labels:
             label_processed = str(preprocess_sentence(normalize_text(label))).split()
             score = self.wup_caculate.compute_score(label_processed, pred_processed)
-            scores.append(score)
+            # Đảm bảo score là scalar
+
+            scores.append(float(score))
         
         return max(scores) if scores else 0.0
     #Cider score - lấy max score với nhiều ground truths
@@ -334,25 +344,11 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
     calculator = ScoreCalculator()
     
     # Tính toán score cho từng sample
-    for i, (ground_truths, generation) in enumerate(zip(all_ground_truths, all_generations)):
-        if i % 100 == 0:
-            print(f"Processing sample {i}/{len(all_ground_truths)}")
-        
+    for i, (ground_truths, generation) in tqdm(enumerate(zip(all_ground_truths, all_generations)), total=len(all_ground_truths)):
         # Đảm bảo ground_truths là list of strings
-        clean_gts = []
-        for gt in ground_truths:
-            if isinstance(gt, str):
-                clean_gts.append(gt.strip())
-            else:
-                clean_gts.append(str(gt).strip())
+        clean_gts = ground_truths
+        clean_gen = generation
         
-        # Đảm bảo generation là string
-        if isinstance(generation, str):
-            clean_gen = generation.strip()
-        else:
-            clean_gen = str(generation).strip()
-        
-        # Tính score cho tất cả metrics
         try:
             all_scores["accuracy"].append(calculator.accuracy_score(clean_gts, clean_gen))
         except Exception as e:
