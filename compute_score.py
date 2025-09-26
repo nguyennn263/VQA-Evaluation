@@ -13,6 +13,7 @@ from precision import Precision
 from recall import Recall
 from rouge import Rouge 
 from wup import Wup
+from bertscore import BERTScore
 from tqdm import tqdm 
 
 def normalize_text(text):
@@ -52,15 +53,16 @@ def preprocess_sentence(sentence: str, tokenizer=None):
 
 class ScoreCalculator:
     def __init__(self):
-        self.acc_caculate=Accuracy()
-        self.bleu_caculate=Bleu()
-        self.cider_caculate=Cider()
-        self.f1_caculate=F1()
-        self.meteor_caculate=Meteor()
-        self.precision_caculate=Precision()
-        self.recall_caculate=Recall()
-        self.rouge_caculate=Rouge()
-        self.wup_caculate=Wup()
+        self.acc_calculate=Accuracy()
+        self.bleu_calculate=Bleu()
+        self.cider_calculate=Cider()
+        self.f1_calculate=F1()
+        self.meteor_calculate=Meteor()
+        self.precision_calculate=Precision()
+        self.recall_calculate=Recall()
+        self.rouge_calculate=Rouge()
+        self.wup_calculate=Wup()
+        self.bertscore_calculate=BERTScore()
      
 
     #F1 score token level - lấy max score với nhiều ground truths  
@@ -80,7 +82,7 @@ class ScoreCalculator:
             joined_label_processed = " ".join(label_processed)
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.f1_caculate.compute_score(gts, res)
+            score, _ = self.f1_calculate.compute_score(gts, res)
             # Đảm bảo score là scalar
             if isinstance(score, (list, tuple, np.ndarray)):
                 score = float(score[0]) if len(score) > 0 else 0.0
@@ -102,7 +104,7 @@ class ScoreCalculator:
         
         for label in labels:
             label_processed = str(preprocess_sentence(normalize_text(label))).split()
-            score = self.wup_caculate.compute_score(label_processed, pred_processed)
+            score = self.wup_calculate.compute_score(label_processed, pred_processed)
             # Đảm bảo score là scalar
 
             scores.append(float(score))
@@ -128,7 +130,7 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà cider module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.cider_caculate.compute_score(gts, res)
+            score, _ = self.cider_calculate.compute_score(gts, res)
             scores.append(score)
         
         return max(scores) if scores else 0.0
@@ -153,7 +155,7 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà accuracy module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.acc_caculate.compute_score(gts, res)
+            score, _ = self.acc_calculate.compute_score(gts, res)
             scores.append(score)
         
         return max(scores) if scores else 0.0
@@ -178,7 +180,7 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà bleu module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.bleu_caculate.compute_score(gts, res)
+            score, _ = self.bleu_calculate.compute_score(gts, res)
             # BLEU có thể trả về tuple, lấy phần tử cuối
             if isinstance(score, (list, tuple)):
                 score = score[-1] if len(score) > 0 else 0.0
@@ -207,7 +209,7 @@ class ScoreCalculator:
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
             try:
-                score, _ = self.meteor_caculate.compute_score(gts, res)
+                score, _ = self.meteor_calculate.compute_score(gts, res)
                 scores.append(score)
             except Exception as e:
                 # METEOR có thể có vấn đề với Java subprocess
@@ -236,7 +238,7 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà precision module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.precision_caculate.compute_score(gts, res)
+            score, _ = self.precision_calculate.compute_score(gts, res)
             scores.append(score)
         
         return max(scores) if scores else 0.0
@@ -261,7 +263,7 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà recall module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.recall_caculate.compute_score(gts, res)
+            score, _ = self.recall_calculate.compute_score(gts, res)
             scores.append(score)
         
         return max(scores) if scores else 0.0
@@ -286,11 +288,46 @@ class ScoreCalculator:
             # Chuẩn bị dữ liệu theo format mà rouge module yêu cầu
             gts = {str(i): [joined_label_processed]}
             res = {str(i): [joined_pred_processed]}
-            score, _ = self.rouge_caculate.compute_score(gts, res)
+            score, _ = self.rouge_calculate.compute_score(gts, res)
             scores.append(score)
         
         return max(scores) if scores else 0.0
     
+    # BERTScore - lấy max P/R/F với nhiều ground truths
+    def bert_score(self, labels: List[str], pred: str) -> tuple[float, float, float]:
+        """
+        Tính BERTScore (Precision, Recall, F1), lấy max score giữa pred và tất cả labels
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :return: Tuple (P, R, F) - max values across labels
+        """
+        p_scores, r_scores, f_scores = [], [], []
+
+        for label in labels:
+            try:
+                # compute_score expects lists of strings
+                P, R, F = self.bertscore_calculate.compute_score(
+                    [pred],
+                    [label],
+                    batch_size=64,
+                    idf=False
+                )
+                p_scores.append(float(P[0].item()))
+                r_scores.append(float(R[0].item()))
+                f_scores.append(float(F[0].item()))
+            except Exception as e:
+                print(f"BERTScore error with label '{label}': {e}")
+                p_scores.append(0.0)
+                r_scores.append(0.0)
+                f_scores.append(0.0)
+
+        return (
+            max(p_scores) if p_scores else 0.0,
+            max(r_scores) if r_scores else 0.0,
+            max(f_scores) if f_scores else 0.0,
+        )
+
+
 
 def compute_score(ground_truths: List[str], generation: str):
     """
@@ -310,7 +347,8 @@ def compute_score(ground_truths: List[str], generation: str):
         "precision": calculator.precision_score(ground_truths, generation),
         "recall": calculator.recall_score(ground_truths, generation),
         "rouge": calculator.rouge_score(ground_truths, generation),
-        "wup": calculator.wup(ground_truths, generation)
+        "wup": calculator.wup(ground_truths, generation),
+        "bertscore": calculator.bert_score(ground_truths, generation)
     }
     
     return scores
@@ -338,7 +376,8 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
         "precision": [],
         "recall": [],
         "rouge": [],
-        "wup": []
+        "wup": [],
+        "bertscore": []
     }
     
     calculator = ScoreCalculator()
@@ -402,6 +441,12 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
         except Exception as e:
             print(f"WUP error at sample {i}: {traceback.format_exc()}")
             all_scores["wup"].append(0.0)
+    
+        try:
+            all_scores["bertscore"].append(calculator.bert_score(clean_gts, clean_gen))
+        except Exception as e:
+            print(f"BERTScore error at sample {i}: {traceback.format_exc()}")
+            all_scores["bertscore"].append(0.0)
     
     # Tính điểm trung bình
     final_scores = {}

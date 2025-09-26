@@ -1,0 +1,8 @@
+nltk
+numpy
+tqdm
+pillow
+numpy
+pandas
+torch
+transformers>=4.0.0
