@@ -294,7 +294,7 @@ class ScoreCalculator:
         return max(scores) if scores else 0.0
     
     # BERTScore - lấy max P/R/F với nhiều ground truths
-    def bert_score(self, labels: List[str], pred: str) -> tuple[float, float, float]:
+    def bert_score(self, labels: List[str], pred: str) -> list[float]:
         """
         Tính BERTScore (Precision, Recall, F1), lấy max score giữa pred và tất cả labels
         :param labels: List các ground truth answers
@@ -321,11 +321,11 @@ class ScoreCalculator:
                 r_scores.append(0.0)
                 f_scores.append(0.0)
 
-        return (
+        return [
             max(p_scores) if p_scores else 0.0,
             max(r_scores) if r_scores else 0.0,
             max(f_scores) if f_scores else 0.0,
-        )
+        ]
 
 
 
@@ -446,23 +446,33 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
             all_scores["bertscore"].append(calculator.bert_score(clean_gts, clean_gen))
         except Exception as e:
             print(f"BERTScore error at sample {i}: {traceback.format_exc()}")
-            all_scores["bertscore"].append(0.0)
+            all_scores["bertscore"].append([0.0, 0.0, 0.0])
     
     # Tính điểm trung bình
     final_scores = {}
     for metric_name, scores_list in all_scores.items():
-        if scores_list:
-            avg_score = np.mean(scores_list)
-            final_scores[metric_name] = {
-                "average": float(avg_score),
-                "individual": scores_list
-            }
-            print(f"✓ {metric_name.upper()}: {avg_score:.4f}")
-        else:
-            final_scores[metric_name] = {
-                "average": 0.0,
-                "individual": []
-            }
+        if not scores_list:
+            final_scores[metric_name] = {"average": 0.0, "individual": []}
             print(f"✗ {metric_name.upper()}: No valid scores")
-    
+            continue
+
+        scores_array = np.array(scores_list)
+
+        # Nếu là BERTScore thì trả về vector trung bình [P, R, F]
+        if metric_name == "bertscore":
+            avg_score = scores_array.mean(axis=0).tolist()
+            avg_display = ", ".join(f"{v:.4f}" for v in avg_score)
+
+            print(f"✓ {metric_name.upper()}: P={avg_score[0]:.4f}, R={avg_score[1]:.4f}, F1={avg_score[2]:.4f}")
+        else:
+            avg_score = float(scores_array.mean())
+            avg_display = f"{avg_score:.4f}"
+
+            print(f"✓ {metric_name.upper()}: {avg_display}")
+
+        final_scores[metric_name] = {
+            "average": avg_score,
+            "individual": scores_list
+        }
+
     return final_scores
