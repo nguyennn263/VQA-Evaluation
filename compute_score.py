@@ -14,7 +14,9 @@ from recall import Recall
 from rouge import Rouge 
 from wup import Wup
 from bertscore import BERTScore
-from tqdm import tqdm 
+from lave import LAVE
+from tqdm import tqdm
+from pathlib import Path
 
 def normalize_text(text):
     text = text.translate(str.maketrans("", "", string.punctuation))
@@ -52,7 +54,7 @@ def preprocess_sentence(sentence: str, tokenizer=None):
     return tokens
 
 class ScoreCalculator:
-    def __init__(self):
+    def __init__(self, vertex_ai_credentials_path: str | Path):
         self.acc_calculate=Accuracy()
         self.bleu_calculate=Bleu()
         self.cider_calculate=Cider()
@@ -63,6 +65,7 @@ class ScoreCalculator:
         self.rouge_calculate=Rouge()
         self.wup_calculate=Wup()
         self.bertscore_calculate=BERTScore()
+        self.lave_calcuate=LAVE(vertex_ai_credentials_path)
      
 
     #F1 score token level - lấy max score với nhiều ground truths  
@@ -327,16 +330,43 @@ class ScoreCalculator:
             max(f_scores) if f_scores else 0.0,
         ]
 
+    def lave_score(self, labels: List[str], pred: str, question: str) -> float:
+        """
+        Tính LAVE score, lấy max score giữa pred và tất cả labels.
+        :param labels: List các ground truth answers
+        :param pred: Generated answer
+        :param question: Câu hỏi gốc (cần cho LAVE)
+        :return: Max LAVE score (0.0 đến 1.0)
+        """
+        scores = []
+
+        # Preprocessing trước khi tính LAVE
+        pred_processed = " ".join(preprocess_sentence(normalize_text(pred)))
+
+        for i, label in enumerate(labels):
+            label_processed = " ".join(preprocess_sentence(normalize_text(label)))
+            try:
+                score = self.lave_calcuate.compute_score(
+                    cand=pred_processed,
+                    refs=[label_processed],
+                    question=question
+                )
+                scores.append(score)
+            except Exception as e:
+                print(f"LAVE error for label {i}: {e}")
+                scores.append(0.0)
+
+        return max(scores) if scores else 0.0
 
 
-def compute_score(ground_truths: List[str], generation: str):
+def compute_score(ground_truths: List[str], generation: str, question: str, vertex_ai_credentials_path: str | Path):
     """
     Tính toán các metric đánh giá cho VQA với max score
     :param ground_truths: list các câu trả lời đúng (list of strings)
     :param generation: câu trả lời được sinh ra (string)
     :return: dictionary chứa các điểm số
     """
-    calculator = ScoreCalculator()
+    calculator = ScoreCalculator(vertex_ai_credentials_path)
     
     scores = {
         "accuracy": calculator.accuracy_score(ground_truths, generation),
@@ -348,13 +378,14 @@ def compute_score(ground_truths: List[str], generation: str):
         "recall": calculator.recall_score(ground_truths, generation),
         "rouge": calculator.rouge_score(ground_truths, generation),
         "wup": calculator.wup(ground_truths, generation),
-        "bertscore": calculator.bert_score(ground_truths, generation)
+        "bertscore": calculator.bert_score(ground_truths, generation),
+        "lave": calculator.lave_score(ground_truths, generation, question)
     }
     
     return scores
 
 
-def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[str]):
+def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[str], all_questions: List[str], vertex_ai_credentials_path: str | Path):
     """
     Tính toán các metric đánh giá cho toàn bộ dataset với max score
     :param all_ground_truths: list of lists - mỗi phần tử là list các câu trả lời đúng cho 1 sample
@@ -362,8 +393,8 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
     :return: dictionary chứa các điểm số trung bình
     """
     
-    if len(all_ground_truths) != len(all_generations):
-        raise ValueError("Số lượng ground_truths và generations phải bằng nhau")
+    if (len(all_ground_truths) != len(all_generations)) or (len(all_ground_truths) != len(all_questions)):
+        raise ValueError("Số lượng ground_truths và generations và questions phải bằng nhau")
     
     print("Computing evaluation metrics with max scoring...")
     
@@ -377,16 +408,18 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
         "recall": [],
         "rouge": [],
         "wup": [],
-        "bertscore": []
+        "bertscore": [],
+        "lave": []
     }
     
-    calculator = ScoreCalculator()
+    calculator = ScoreCalculator(vertex_ai_credentials_path)
     
     # Tính toán score cho từng sample
-    for i, (ground_truths, generation) in tqdm(enumerate(zip(all_ground_truths, all_generations)), total=len(all_ground_truths)):
+    for i, (ground_truths, generation, question) in tqdm(enumerate(zip(all_ground_truths, all_generations, all_questions)), total=len(all_ground_truths)):
         # Đảm bảo ground_truths là list of strings
         clean_gts = ground_truths
         clean_gen = generation
+        clean_ques = question
         
         try:
             all_scores["accuracy"].append(calculator.accuracy_score(clean_gts, clean_gen))
@@ -447,6 +480,13 @@ def compute_all_data(all_ground_truths: List[List[str]], all_generations: List[s
         except Exception as e:
             print(f"BERTScore error at sample {i}: {traceback.format_exc()}")
             all_scores["bertscore"].append([0.0, 0.0, 0.0])
+
+        try:
+            all_scores["lave"].append(calculator.lave_score(clean_gts, clean_gen, clean_ques))
+        except Exception as e:
+            print(f"LAVE error at sample {i}: {traceback.format_exc()}")
+            all_scores["lave"].append(0.0)
+            
     
     # Tính điểm trung bình
     final_scores = {}
